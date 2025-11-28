@@ -87,7 +87,40 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y mc wireguard ssh curl sudo jq fping snmp
 
-### 6. Скрипт monito-install.sh
+### 6. Фиксируем /boot/boot.config под нужное ядро
+
+BOOTCFG="/boot/boot.config"
+echo "[*] Правим ${BOOTCFG} под нужное ядро..."
+
+if [[ -f "${BOOTCFG}" ]]; then
+  sed -i 's/^majorbranch=.*/majorbranch=6.x.y/' "${BOOTCFG}" || true
+  sed -i 's/^branch=.*/branch=6.12.y/' "${BOOTCFG}" || true
+  sed -i 's/^release=.*/release=6.12.17-meson64/' "${BOOTCFG}" || true
+  sed -i 's/^variant=.*/variant=mainline/' "${BOOTCFG}" || true
+else
+  cat >"${BOOTCFG}" <<'EOF'
+# Kernel version config
+majorbranch=6.x.y
+branch=6.12.y
+release=6.12.17-meson64
+variant=mainline
+EOF
+fi
+
+chmod 644 "${BOOTCFG}"
+chown root:root "${BOOTCFG}"
+
+# По возможности делаем файл immutable, чтобы даже root-скрипты не могли перезаписать его случайно
+if command -v chattr >/dev/null 2>&1; then
+  chattr +i "${BOOTCFG}" || echo "[WARN] Не удалось выставить immutable на ${BOOTCFG}"
+  echo "[*] ${BOOTCFG} помечен как immutable (chattr +i)"
+else
+  echo "[WARN] chattr не найден, immutable-режим для ${BOOTCFG} не установлен"
+fi
+
+
+
+### 7. Скрипт monito-install.sh
 
 echo "[*] Создаем /root/monito-install.sh..."
 cat >/root/monito-install.sh <<'EOF'
@@ -98,5 +131,12 @@ EOF
 chmod +x /root/monito-install.sh
 
 echo "[+] Готово!"
-echo "[+] monito-install.sh создан."
 echo "[+] Ядро поставлено на hold (обновление через APT не произойдёт)."
+echo "[+] Пароль root изменен на 'monito'."
+echo "[+] Hostname изменен на 'monito-box'."
+echo "[+] MOTD и ISSUE изменены."
+echo "[+] Установлены пакеты mc, wireguard, ssh, curl, sudo, jq, fping, snmp."
+echo "[+] Файл /boot/boot.config изменен."
+echo "[+] Скрипт monito-install.sh создан."
+echo "[+] Хост готов к установке Monito."
+echo "[+] Для установки Мonito выполните команду: /root/monito-install.sh"

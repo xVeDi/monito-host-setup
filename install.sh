@@ -57,8 +57,17 @@ echo 'root:monito' | chpasswd
 ### 4. HOLD ядра
 
 echo "[*] Ставим hold на пакеты ядра..."
-kernel_pkgs=$(dpkg-query -W -f='${Package}\n' 'linux-image*' 'linux-headers*' 2>/dev/null || true)
-echo "$kernel_pkgs" | xargs -r apt-mark hold
+
+# Берём только реальные версионированные пакеты, а не виртуальный 'linux-image'
+kernel_pkgs=$(dpkg-query -W -f='${Package}\n' 'linux-image-[0-9]*' 'linux-headers-[0-9]*' 2>/dev/null || true)
+
+if [[ -n "${kernel_pkgs}" ]]; then
+  echo "${kernel_pkgs}" | xargs -r apt-mark hold || true
+  echo "[*] Заблокированы пакеты ядра:"
+  echo "${kernel_pkgs}"
+else
+  echo "[*] Не найдено установленных пакетов linux-image-*/linux-headers-* (ничего блокировать)."
+fi
 
 ### 5. ПО
 
@@ -84,4 +93,3 @@ echo "[+] ПО установлено (mc, wireguard, ssh, curl, sudo, jq, fping
 echo "[+] Hostname установлен (monito-box)."
 echo "[+] Пароль root установлен (monito)."
 echo "[+] Скрипт monito-install.sh создан."
-echo "[+] Для установки monito выполните /root/monito-install.sh."

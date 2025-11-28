@@ -52,12 +52,17 @@ else
   echo -e "127.0.1.1\tmonito-box" >> /etc/hosts
 fi
 
-### 3. Пароль root
+### 3. Временная зона
+
+echo "[*] Устанавливаем временную зону Europe/Moscow..."
+timedatectl set-timezone Europe/Moscow
+
+### 4. Пароль root
 
 echo "[*] Меняем пароль root на 'monito'..."
 echo 'root:monito' | chpasswd
 
-### 4. HOLD ядра
+### 5. HOLD ядра
 
 echo "[*] Ставим hold на пакеты ядра..."
 
@@ -79,7 +84,7 @@ else
   echo "[*] Установленных пакетов linux-image-*/linux-headers-* не найдено."
 fi
 
-### 5. Полный запрет установки новых ядер через APT (pinning)
+### 6. Полный запрет установки новых ядер через APT (pinning)
 
 echo "[*] Включаем APT pinning: запрещаем установку любых новых ядер и headers..."
 
@@ -96,14 +101,14 @@ EOF
 echo "[*] APT pinning установлен: linux-image* и linux-headers* больше не будут устанавливаться."
 
 
-### 6. Установка ПО
+### 7. Установка ПО
 
 echo "[*] Устанавливаем ПО..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y mc wireguard-tools ssh curl sudo jq fping snmp
 
-### 7. Фикс /boot/boot.config
+### 8. Фикс /boot/boot.config
 
 echo "[*] Правим /boot/boot.config..."
 
@@ -135,7 +140,7 @@ else
   echo "[WARN] chattr не найден, immutable не установлен."
 fi
 
-### 8. Скрипт установки monito
+### 9. Скрипт установки monito
 
 echo "[*] Создаем /root/monito-install.sh..."
 cat >/root/monito-install.sh <<'EOF'
@@ -145,7 +150,7 @@ EOF
 
 chmod +x /root/monito-install.sh
 
-### 9. Финальное сообщение
+### 10. Финальное сообщение
 
 echo
 echo "[✓] Установка завершена!"

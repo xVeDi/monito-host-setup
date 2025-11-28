@@ -79,14 +79,31 @@ else
   echo "[*] Установленных пакетов linux-image-*/linux-headers-* не найдено."
 fi
 
-### 5. Установка ПО
+### 5. Полный запрет установки новых ядер через APT (pinning)
+
+echo "[*] Включаем APT pinning: запрещаем установку любых новых ядер и headers..."
+
+cat >/etc/apt/preferences.d/no-kernel <<'EOF'
+Package: linux-image*
+Pin: version *
+Pin-Priority: -1
+
+Package: linux-headers*
+Pin: version *
+Pin-Priority: -1
+EOF
+
+echo "[*] APT pinning установлен: linux-image* и linux-headers* больше не будут устанавливаться."
+
+
+### 6. Установка ПО
 
 echo "[*] Устанавливаем ПО..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y mc wireguard ssh curl sudo jq fping snmp
 
-### 6. Фикс /boot/boot.config
+### 7. Фикс /boot/boot.config
 
 echo "[*] Правим /boot/boot.config..."
 
@@ -118,7 +135,7 @@ else
   echo "[WARN] chattr не найден, immutable не установлен."
 fi
 
-### 7. Скрипт установки monito
+### 8. Скрипт установки monito
 
 echo "[*] Создаем /root/monito-install.sh..."
 cat >/root/monito-install.sh <<'EOF'
@@ -128,7 +145,7 @@ EOF
 
 chmod +x /root/monito-install.sh
 
-### 8. Финальное сообщение
+### 9. Финальное сообщение
 
 echo
 echo "[✓] Установка завершена!"

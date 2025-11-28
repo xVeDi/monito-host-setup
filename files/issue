@@ -1,0 +1,30 @@
+ #############################################################################
+ #                                                                           #
+ #            \e[0;32m███╗   ███╗ ██████╗ ███╗   ██╗██╗████████╗ ██████╗            \e[0m #
+ #            \e[0;32m████╗ ████║██╔═══██╗████╗  ██║██║╚══██╔══╝██╔═══██╗           \e[0m #
+ #            \e[0;32m██╔████╔██║██║   ██║██╔██╗ ██║██║   ██║   ██║   ██║           \e[0m #
+ #            \e[0;32m██║╚██╔╝██║██║   ██║██║╚██╗██║██║   ██║   ██║   ██║           \e[0m #
+ #            \e[0;32m██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║   ██║   ╚██████╔╝           \e[0m #
+ #            \e[0;32m╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝   ╚═╝    ╚═════╝            \e[0m #
+ #                                                                           #
+ # ------------------------------------------------------------------------- #                                                                           #
+ #  WARNING: This is a private system!                                       #
+ #           Unauthorized access to this system is forbidden and will be     #
+ #           prosecuted by law.                                              #
+ #           By accessing this system, you agree that your actions will be   #
+ #           monitored and logged.                                           #
+ #                                                                           #
+ # ------------------------------------------------------------------------- #
+ #                                                                           #
+ #  \e{lightred}\S\e{reset} with Kernel \e{lightred}\r\e{reset} on \e{lightred}\m\e{reset} \e[77G #
+ #                                                                           #
+ #  Host:        \e[1;37m\n\e{reset}              \e[77G #
+ #  IP address:  \e{lightgreen}\4\e{reset}    \e[77G #
+ #                                                                           #
+ # ------------------------------------------------------------------------- #
+ #                                                                           #
+ #  Default login: \e[1;37mroot\e{reset}/\e[1;37mtvbox\e{reset} It might be wise to change that immediately ;) #
+ #                                                                           #
+ #############################################################################
+ 
+\d \t on \l

@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+#    00-header - create the header of the MOTD
+#    Copyright (C) 2009-2010 Canonical Ltd.
+#
+#    Authors: Dustin Kirkland <kirkland@canonical.com>
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along
+#    with this program; if not, write to the Free Software Foundation, Inc.,
+#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+[ -r /etc/os-release ] && . /etc/os-release
+
+#DISTRIB_DESCRIPTION="${NAME}${VERSION:+ $VERSION}"
+DISTRIB_DESCRIPTION="${NAME}${VERSION_ID:+ $VERSION_ID}${VERSION_CODENAME:+ (${VERSION_CODENAME^})}"
+
+if [ -z "$DISTRIB_DESCRIPTION" ] && [ -x /usr/bin/lsb_release ]; then
+	# Fall back to using the very slow lsb_release utility
+	DISTRIB_DESCRIPTION=$(lsb_release -s -d)
+fi
+
+RED='\x1B[0;31m'
+LRED='\x1B[0;91m'
+GRAY='\x1b[0;90m'
+GREEN='\x1B[0;32m'
+WHITE='\x1B[1;37m'
+DEF='\x1B[0m' # No Color
+
+
+COMPATIBLE=( $(sed -E "s|.*\x0([^ ]+),([^,]+)\x0$|\1 \2|" /sys/firmware/devicetree/base/compatible 2>/dev/null || echo "UNKNOWN") )
+
+SOC_FULL_NAME=$( [[ -f /sys/bus/soc/devices/soc0/soc_id ]] && cat /sys/bus/soc/devices/soc0/soc_id \
+				|| grep -Po "model name\s*:\s*\K.*" /proc/cpuinfo \
+				|| echo "${COMPATIBLE[1]^^}" \
+				| head -1 )
+SOC_NAME=$(grep -oP '(?<=\()[^)]+(?=\))' <<< ${SOC_FULL_NAME})
+[[ ${SOC_NAME} = "" ]] && SOC_NAME="${SOC_FULL_NAME% *}"
+SOC_FAMILY=$([[ -f /sys/bus/soc/devices/soc0/family ]] && cat /sys/bus/soc/devices/soc0/family || echo "${COMPATIBLE[0]^}")
+SOC_ARCH=$(uname -m)
+[[ "${SOC_ARCH}" = "aarch64" ]] && SOC_ARCH="arm64"
+DEVICE_NAME=$( cat /sys/bus/soc/devices/soc0/machine 2>/dev/null \
+			|| sed "s/\x0//g" /sys/firmware/devicetree/base/model 2>/dev/null \
+			|| grep -Po "model name\s*:\s*\K.*" /proc/cpuinfo \
+			|head -n1 )
+
+HEADER="${SOC_FAMILY% *}${SOC_NAME+ ${SOC_NAME}}"
+
+TERM=linux clear -x
+
+TERM=linux toilet -w85 -f standard -F metal "${HEADER:-TV-Box}"
+echo -e "\n${GRAY}${SOC_FAMILY} ${SOC_FULL_NAME} - ${DEVICE_NAME}${DEF}\n"
+echo -e "Welcome to ${LRED}${DISTRIB_DESCRIPTION}${DEF} with ${LRED}$(uname) $(uname -r)${DEF} on ${LRED}${SOC_ARCH^^}${DEF}"

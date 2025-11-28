@@ -1,0 +1,70 @@
+#!/bin/bash
+
+column() {
+	local RED='\x1B[0;31m' LRED='\x1B[0;91m' GRAY='\x1B[0;90m' GREEN='\x1B[0;32m' LGREEN='\x1B[0;92m' WHITE='\x1B[1;37m' YELLOW='\x1B[0;33m' LYELLOW='\x1B[0;93m' DEF='\x1B[0m' color="DEF"
+	[[ "$1" =~ ^([L]?RED|WHITE|DEF|[L]?GRAY|[L]?GREEN|[L]YELLOW)$ ]] && color=$1 && shift
+	local width=$1; shift
+	printf "${!color}%-${width}s${DEF}" "$*"
+}
+
+row() {
+	local notab=(${*})
+	eval "echo -e \"${notab[@]}\""
+}
+
+ROOTFS=$(findmnt --target / -n -o SOURCE)
+ROOTFS_TOTAL=$(df -H / --output=pcent,size|sed -n 2p)
+ROOTFS_USAGE=${ROOTFS_TOTAL%'%'*}
+ROOTFS_TOTAL=$(echo ${ROOTFS_TOTAL}|'grep' -Eo '[0-9.]+[KGM]?$')
+ROOTFS_COLOR=LGREEN
+(( ROOTFS_USAGE > 70 )) && ROOTFS_COLOR=LYELLOW
+(( ROOTFS_USAGE > 90 )) && ROOTFS_COLOR=LRED
+
+BOOTFS=$(findmnt --target /boot -n -o SOURCE)
+BOOTFS_TOTAL=$(df -H /boot --output=pcent,size|sed -n 2p)
+BOOTFS_USAGE=${BOOTFS_TOTAL%'%'*}
+BOOTFS_TOTAL=$(echo ${BOOTFS_TOTAL}|'grep' -Eo '[0-9.]+[KGM]?$')
+BOOTFS_COLOR=LGREEN
+(( BOOTFS_USAGE > 70 )) && BOOTFS_COLOR=LYELLOW
+(( BOOTFS_USAGE > 90 )) && BOOTFS_COLOR=LRED
+
+#UPTIME=$(uptime|'grep' -oE "[0-9]+ (min|days)"|head -n1)
+UPTIME=$(uptime|sed -E "s/.*up\s+([0-9]+(:|\sdays|\smin)).*/\1/"|sed "s/:/ hours/")
+CPULOAD=$(uptime|'grep' -Po '(?<=average: )[0-9]+')
+MEMLOAD=$(free --mebi|'grep' "Mem"|sed -E 's/([^0-9]+([0-9]+)[^0-9]+([0-9]+).*)/\2 \3/')
+MEMTOTAL=$(echo $MEMLOAD|cut -d' ' -f1)
+MEMLOAD=$(echo $MEMLOAD|cut -d' ' -f2)
+MEMLOAD=$(( (($MEMTOTAL/2) + ($MEMLOAD * 100)) / $MEMTOTAL ))
+
+BOOTTIME=$(systemd-analyze 2>/dev/null |head -n 1|'grep' -Po '[0-9]+(?=\.[0-9]+s\s?$)')
+[[ -z ${BOOTTIME} ]] && \
+	BOOTTIME=$(cat /proc/uptime | 'grep' -Eo '^[0-9]+')
+BOOTTIME_COLOR=LGREEN
+(( BOOTTIME > 30 )) && BOOTTIME_COLOR=LYELLOW
+(( BOOTTIME > 60 )) && BOOTTIME_COLOR=LRED
+
+
+CPUTEMP=$(( $(cat /sys/devices/virtual/thermal/thermal_zone0/temp 2>/dev/null || echo -99000) / 1000 ))
+CPUTEMP_COLOR=LGREEN
+(( CPUTEMP > 60 )) && CPUTEMP_COLOR=LYELLOW
+(( CPUTEMP > 80 )) && CPUTEMP_COLOR=LRED
+(( CPUTEMP == -99 )) && CPUTEMP_COLOR=GRAY && CPUTEMP="__"
+
+DDRTEMP=$(( $(cat /sys/devices/virtual/thermal/thermal_zone1/temp 2>/dev/null || echo -99000) / 1000 ))
+DDRTEMP_COLOR=LGREEN
+(( DDRTEMP > 60 )) && DDRTEMP_COLOR=LYELLOW
+(( DDRTEMP > 80 )) && DDRTEMP_COLOR=LRED
+(( DDRTEMP == -99 )) && DDRTEMP_COLOR=GRAY && DDRTEMP="__"
+
+IPADDRESSES=($(ip a|'grep' -Po "(?<=inet\s)[0-9.]+(?=.*brd)"|xargs))
+EXTERNAL_IP4=$(dig @ns1.google.com TXT o-o.myaddr.l.google.com +short -4|cut -d'"' -f2)
+EXTERNAL_IP6=$(dig @ns1.google.com TXT o-o.myaddr.l.google.com +short -6|cut -d'"' -f2)
+echo ""
+row '$(column 14 Up time:)		$(column WHITE 18 ${UPTIME})				$(column 14 Boot time:)			$(column ${BOOTTIME_COLOR} 1 ${BOOTTIME} s)'
+row '$(column 14 CPU usage:)	$(column LGREEN 18 ${CPULOAD}%)				$(column 14 Memory usage:) 		$(column LGREEN 0 ${MEMLOAD}%) of ${MEMTOTAL}M'
+row '$(column 14 CPU temp:)		$(column ${CPUTEMP_COLOR} 20 "${CPUTEMP}°C")$(column 14 DDR temp:) 			$(column ${DDRTEMP_COLOR} 0  ${DDRTEMP}°C)'
+row '$(column 14 Boot device:)	$(column WHITE 18 ${BOOTFS})				$(column 14 Usage /boot:) 		$(column ${BOOTFS_COLOR} 0 ${BOOTFS_USAGE}%) of ${BOOTFS_TOTAL}'
+row '$(column 14 Root FS:)		$(column WHITE 18 ${ROOTFS})				$(column 14 Usage / :) 			$(column ${ROOTFS_COLOR} 0 ${ROOTFS_USAGE}%) of ${ROOTFS_TOTAL}'
+row '$(column 14 External IPv4:)	$(column LGREEN 18 ${EXTERNAL_IP4})    $(column 14 External IPv6:)	$(column LGREEN 18 ${EXTERNAL_IP6})'
+row '$(column 14 IP address:)	$(column LGREEN 18 ${IPADDRESSES[0]})		$(column LGREEN 14 ${IPADDRESSES[1]})	$(column LGREEN 14 ${IPADDRESSES[2]})'
+echo ""

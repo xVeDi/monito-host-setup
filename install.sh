@@ -23,7 +23,7 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   exit 1
 fi
 
-echo "[*] Настройка хоста для monito-box..."
+echo "[*] Настройка хоста для работы Monito..."
 
 ### 1. Устанавливаем MOTD и issue*
 
@@ -150,7 +150,7 @@ chmod +x /root/monito-install.sh
 echo
 echo "[✓] Установка завершена!"
 echo "[✓] Ядро зафиксировано и boot.config защищён."
-echo "[✓] Для установки monito запускайте: /root/monito-install.sh"
+echo "[✓] Для установки Monito запускайте: /root/monito-install.sh"
 echo
 
 read -r -p "Хотите выполнить перезагрузку сейчас? [y/N]: " ans

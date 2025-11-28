@@ -25,7 +25,7 @@ fi
 
 echo "[*] Настройка хоста для monito-box..."
 
-### 1. Качаем и устанавливаем MOTD и ISSUE
+### 1. Устанавливаем MOTD и issue*
 
 echo "[*] Копируем файлы motd и issue..."
 
@@ -61,7 +61,6 @@ echo 'root:monito' | chpasswd
 
 echo "[*] Ставим hold на пакеты ядра..."
 
-# Берём только реально установленные пакеты ядра
 kernel_pkgs=$(dpkg -l 'linux-image*' 'linux-headers*' 2>/dev/null \
   | awk '/^ii/ {print $2}' \
   | grep -E '^(linux-image|linux-headers)-' || true)
@@ -87,10 +86,11 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y mc wireguard ssh curl sudo jq fping snmp
 
-### 6. Фиксируем /boot/boot.config под нужное ядро
+### 6. Фикс /boot/boot.config
+
+echo "[*] Правим /boot/boot.config..."
 
 BOOTCFG="/boot/boot.config"
-echo "[*] Правим ${BOOTCFG} под нужное ядро..."
 
 if [[ -f "${BOOTCFG}" ]]; then
   sed -i 's/^majorbranch=.*/majorbranch=6.x.y/' "${BOOTCFG}" || true
@@ -110,17 +110,15 @@ fi
 chmod 644 "${BOOTCFG}"
 chown root:root "${BOOTCFG}"
 
-# По возможности делаем файл immutable, чтобы даже root-скрипты не могли перезаписать его случайно
+# Попытка сделать immutable
 if command -v chattr >/dev/null 2>&1; then
   chattr +i "${BOOTCFG}" || echo "[WARN] Не удалось выставить immutable на ${BOOTCFG}"
-  echo "[*] ${BOOTCFG} помечен как immutable (chattr +i)"
+  echo "[*] ${BOOTCFG} помечен как immutable"
 else
-  echo "[WARN] chattr не найден, immutable-режим для ${BOOTCFG} не установлен"
+  echo "[WARN] chattr не найден, immutable не установлен."
 fi
 
-
-
-### 7. Скрипт monito-install.sh
+### 7. Скрипт установки monito
 
 echo "[*] Создаем /root/monito-install.sh..."
 cat >/root/monito-install.sh <<'EOF'
@@ -130,13 +128,22 @@ EOF
 
 chmod +x /root/monito-install.sh
 
-echo "[+] Готово!"
-echo "[+] Ядро поставлено на hold (обновление через APT не произойдёт)."
-echo "[+] Пароль root изменен на 'monito'."
-echo "[+] Hostname изменен на 'monito-box'."
-echo "[+] MOTD и ISSUE изменены."
-echo "[+] Установлены пакеты mc, wireguard, ssh, curl, sudo, jq, fping, snmp."
-echo "[+] Файл /boot/boot.config изменен."
-echo "[+] Скрипт monito-install.sh создан."
-echo "[+] Хост готов к установке Monito."
-echo "[+] Для установки Мonito выполните команду: /root/monito-install.sh"
+### 8. Финальное сообщение
+
+echo
+echo "[✓] Установка завершена!"
+echo "[✓] Ядро зафиксировано и boot.config защищён."
+echo "[✓] Для установки monito запускайте: /root/monito-install.sh"
+echo
+
+read -r -p "Хотите выполнить перезагрузку сейчас? [y/N]: " ans
+case "${ans,,}" in
+    y|yes)
+        echo "Перезагрузка..."
+        sleep 1
+        reboot
+        ;;
+    *)
+        echo "Ок, перезагрузка отменена. Не забудьте выполнить reboot позже."
+        ;;
+esac

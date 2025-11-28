@@ -1,84 +1,75 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_RAW="https://raw.githubusercontent.com/xVeDi/monito-host-setup/main/files"
+
+download() {
+    local file="$1"
+    local dest="$2"
+
+    if command -v wget >/dev/null; then
+        wget -qO "$dest" "$REPO_RAW/$file"
+    elif command -v curl >/dev/null; then
+        curl -fsSL -o "$dest" "$REPO_RAW/$file"
+    else
+        echo "Нужен wget или curl для загрузки файлов."
+        exit 1
+    fi
+}
+
 ### 0. Проверка прав
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-  echo "Этот скрипт нужно запускать от root (sudo)."
+  echo "Этот скрипт нужно запускать от root."
   exit 1
 fi
 
 echo "[*] Настройка хоста для monito-box..."
 
-### 1. Устанавливаем MOTD и /etc/issue*
+### 1. Качаем и устанавливаем MOTD и ISSUE
 
 echo "[*] Копируем файлы motd и issue..."
 
-# Убедимся, что каталог существует
 install -d /usr/lib/qubian/update-motd.d
 
-# Копируем 01-header и 15-system-state
-install -m 0755 "files/01-header"       "/usr/lib/qubian/update-motd.d/01-header"
-install -m 0755 "files/15-system-state" "/usr/lib/qubian/update-motd.d/15-system-state"
+download "01-header"       "/usr/lib/qubian/update-motd.d/01-header"
+download "15-system-state" "/usr/lib/qubian/update-motd.d/15-system-state"
 
-# /etc/issue и /etc/issue.net
-install -m 0644 "files/issue"     "/etc/issue"
-install -m 0644 "files/issue.net" "/etc/issue.net"
+download "issue"     "/etc/issue"
+download "issue.net" "/etc/issue.net"
+
+chmod 755 /usr/lib/qubian/update-motd.d/01-header
+chmod 755 /usr/lib/qubian/update-motd.d/15-system-state
+chmod 644 /etc/issue /etc/issue.net
 
 ### 2. Имя хоста
 
 echo "[*] Меняем hostname на monito-box..."
-
 hostnamectl set-hostname monito-box
 
-# Обновим /etc/hosts, чтобы 127.0.1.1 указывал на monito-box
-if grep -q '^127\.0\.1\.1' /etc/hosts; then
-  sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tmonito-box/' /etc/hosts
-else
-  echo -e "127.0.1.1\tmonito-box" >> /etc/hosts
-fi
+sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tmonito-box/' /etc/hosts || \
+echo -e "127.0.1.1\tmonito-box" >> /etc/hosts
 
 ### 3. Пароль root
 
 echo "[*] Меняем пароль root на 'monito'..."
-
-# ВНИМАНИЕ: пароль будет лежать в открытом виде в репозитории GitHub.
 echo 'root:monito' | chpasswd
 
-### 4. Блокируем обновление ядра
+### 4. HOLD ядра
 
-echo "[*] Ставим hold на установленные пакеты ядра (linux-image*, linux-headers*)..."
-
-# Собираем список уже установленных пакетов ядра
+echo "[*] Ставим hold на пакеты ядра..."
 kernel_pkgs=$(dpkg-query -W -f='${Package}\n' 'linux-image*' 'linux-headers*' 2>/dev/null || true)
+echo "$kernel_pkgs" | xargs -r apt-mark hold
 
-if [[ -n "${kernel_pkgs}" ]]; then
-  echo "${kernel_pkgs}" | xargs -r apt-mark hold
-  echo "[*] Заблокированы пакеты:"
-  echo "${kernel_pkgs}"
-else
-  echo "[*] Установленных пакетов linux-image*/linux-headers* не найдено (это странно для Debian, но ладно)."
-fi
+### 5. ПО
 
-### 5. Установка пакетов (без обновления ядра)
-
-echo "[*] Устанавливаем пакеты: mc wireguard ssh curl sudo jq fping snmp..."
-
+echo "[*] Устанавливаем ПО..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y \
-  mc \
-  wireguard \
-  ssh \
-  curl \
-  sudo \
-  jq \
-  fping \
-  snmp
+apt-get install -y mc wireguard ssh curl sudo jq fping snmp
 
-### 6. Скрипт /root/monito-install.sh
+### 6. Скрипт monito-install.sh
 
 echo "[*] Создаем /root/monito-install.sh..."
-
 cat >/root/monito-install.sh <<'EOF'
 #!/usr/bin/env bash
 curl -s https://get.monito.run | bash
@@ -86,6 +77,11 @@ EOF
 
 chmod +x /root/monito-install.sh
 
-echo "[+] Готово. Хост настроен как monito-box."
-echo "[+] Для установки monito можно запустить /root/monito-install.sh"
-echo "[+] Обновление ядра через APT заблокировано (apt-mark hold для linux-image*/linux-headers*)."
+echo "[+] Готово!"
+echo "[+] monito-install.sh создан."
+echo "[+] Ядро заморожено (apt-mark hold)."
+echo "[+] ПО установлено (mc, wireguard, ssh, curl, sudo, jq, fping, snmp)."
+echo "[+] Hostname установлен (monito-box)."
+echo "[+] Пароль root установлен (monito)."
+echo "[+] Скрипт monito-install.sh создан."
+echo "[+] Для установки monito выполните /root/monito-install.sh."

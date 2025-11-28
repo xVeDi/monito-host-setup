@@ -46,8 +46,11 @@ chmod 644 /etc/issue /etc/issue.net
 echo "[*] Меняем hostname на monito-box..."
 hostnamectl set-hostname monito-box
 
-sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tmonito-box/' /etc/hosts || \
-echo -e "127.0.1.1\tmonito-box" >> /etc/hosts
+if grep -q '^127\.0\.1\.1' /etc/hosts; then
+  sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tmonito-box/' /etc/hosts
+else
+  echo -e "127.0.1.1\tmonito-box" >> /etc/hosts
+fi
 
 ### 3. Пароль root
 
@@ -58,18 +61,26 @@ echo 'root:monito' | chpasswd
 
 echo "[*] Ставим hold на пакеты ядра..."
 
-# Берём только реальные версионированные пакеты, а не виртуальный 'linux-image'
-kernel_pkgs=$(dpkg-query -W -f='${Package}\n' 'linux-image-[0-9]*' 'linux-headers-[0-9]*' 2>/dev/null || true)
+# Берём только реально установленные пакеты ядра
+kernel_pkgs=$(dpkg -l 'linux-image*' 'linux-headers*' 2>/dev/null \
+  | awk '/^ii/ {print $2}' \
+  | grep -E '^(linux-image|linux-headers)-' || true)
 
 if [[ -n "${kernel_pkgs}" ]]; then
-  echo "${kernel_pkgs}" | xargs -r apt-mark hold || true
-  echo "[*] Заблокированы пакеты ядра:"
+  echo "[*] Найдены пакеты ядра для hold:"
   echo "${kernel_pkgs}"
+  for pkg in ${kernel_pkgs}; do
+    if apt-mark hold "${pkg}" >/dev/null 2>&1; then
+      echo "    - ${pkg} поставлен на hold"
+    else
+      echo "    - [WARN] не удалось поставить на hold ${pkg}"
+    fi
+  done
 else
-  echo "[*] Не найдено установленных пакетов linux-image-*/linux-headers-* (ничего блокировать)."
+  echo "[*] Установленных пакетов linux-image-*/linux-headers-* не найдено."
 fi
 
-### 5. ПО
+### 5. Установка ПО
 
 echo "[*] Устанавливаем ПО..."
 export DEBIAN_FRONTEND=noninteractive
@@ -88,8 +99,4 @@ chmod +x /root/monito-install.sh
 
 echo "[+] Готово!"
 echo "[+] monito-install.sh создан."
-echo "[+] Ядро заморожено (apt-mark hold)."
-echo "[+] ПО установлено (mc, wireguard, ssh, curl, sudo, jq, fping, snmp)."
-echo "[+] Hostname установлен (monito-box)."
-echo "[+] Пароль root установлен (monito)."
-echo "[+] Скрипт monito-install.sh создан."
+echo "[+] Ядро поставлено на hold (обновление через APT не произойдёт)."

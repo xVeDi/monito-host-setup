@@ -101,7 +101,7 @@ echo "[*] APT pinning установлен: linux-image* и linux-headers* бо�
 echo "[*] Устанавливаем ПО..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y mc wireguard ssh curl sudo jq fping snmp
+apt-get install -y mc wireguard-tools ssh curl sudo jq fping snmp
 
 ### 7. Фикс /boot/boot.config
 

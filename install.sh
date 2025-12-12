@@ -3,91 +3,107 @@ set -euo pipefail
 
 REPO_RAW="https://raw.githubusercontent.com/xVeDi/monito-host-setup/main/files"
 
-download() {
+log() {
+    echo "[`date '+%Y-%m-%d %H:%M:%S'`] $1"
+}
+
+check_command() {
+    if ! command -v "$1" >/dev/null; then
+        log "[ERROR] Команда $1 не найдена. Установите её и повторите попытку."
+        exit 1
+    fi
+}
+
+# Проверка необходимых команд
+check_command wget
+check_command curl
+check_command hostnamectl
+check_command timedatectl
+check_command chpasswd
+check_command apt-get
+
+# Функция загрузки файлов с проверкой существования
+safe_download() {
     local file="$1"
     local dest="$2"
+
+    if [[ -f "$dest" ]]; then
+        log "[INFO] Файл $dest уже существует, пропускаем загрузку."
+        return
+    fi
 
     if command -v wget >/dev/null; then
         wget -qO "$dest" "$REPO_RAW/$file"
     elif command -v curl >/dev/null; then
         curl -fsSL -o "$dest" "$REPO_RAW/$file"
     else
-        echo "Нужен wget или curl для загрузки файлов."
+        log "[ERROR] Нужен wget или curl для загрузки файлов."
         exit 1
     fi
 }
 
-### 0. Проверка прав
+# Проверка прав
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-  echo "Этот скрипт нужно запускать от root."
-  exit 1
+    log "[ERROR] Этот скрипт нужно запускать от root."
+    exit 1
 fi
 
-echo "[*] Настройка хоста для работы Monito..."
+log "[*] Настройка хоста для работы Monito..."
 
-### 1. Устанавливаем MOTD и issue*
-
-echo "[*] Копируем файлы motd и issue..."
-
+# Устанавливаем MOTD и issue*
+log "[*] Копируем файлы motd и issue..."
 install -d /usr/lib/qubian/update-motd.d
 
-download "01-header"       "/usr/lib/qubian/update-motd.d/01-header"
-download "15-system-state" "/usr/lib/qubian/update-motd.d/15-system-state"
+safe_download "01-header"       "/usr/lib/qubian/update-motd.d/01-header"
+safe_download "15-system-state" "/usr/lib/qubian/update-motd.d/15-system-state"
 
-download "issue"     "/etc/issue"
-download "issue.net" "/etc/issue.net"
+safe_download "issue"     "/etc/issue"
+safe_download "issue.net" "/etc/issue.net"
 
 chmod 755 /usr/lib/qubian/update-motd.d/01-header
 chmod 755 /usr/lib/qubian/update-motd.d/15-system-state
 chmod 644 /etc/issue /etc/issue.net
 
-### 2. Имя хоста
-
-echo "[*] Меняем hostname на monito-box..."
+# Имя хоста
+log "[*] Меняем hostname на monito-box..."
 hostnamectl set-hostname monito-box
 
 if grep -q '^127\.0\.1\.1' /etc/hosts; then
-  sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tmonito-box/' /etc/hosts
+    sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tmonito-box/' /etc/hosts
 else
-  echo -e "127.0.1.1\tmonito-box" >> /etc/hosts
+    echo -e "127.0.1.1\tmonito-box" >> /etc/hosts
 fi
 
-### 3. Временная зона
-
-echo "[*] Устанавливаем временную зону Europe/Moscow..."
+# Временная зона
+log "[*] Устанавливаем временную зону Europe/Moscow..."
 timedatectl set-timezone Europe/Moscow
 
-### 4. Пароль root
-
-echo "[*] Меняем пароль root на 'monito'..."
+# Пароль root
+log "[*] Меняем пароль root на 'monito'..."
 echo 'root:monito' | chpasswd
 
-### 5. HOLD ядра
-
-echo "[*] Ставим hold на пакеты ядра..."
-
+# HOLD ядра
+log "[*] Ставим hold на пакеты ядра..."
 kernel_pkgs=$(dpkg -l 'linux-image*' 'linux-headers*' 2>/dev/null \
   | awk '/^ii/ {print $2}' \
   | grep -E '^(linux-image|linux-headers)-' || true)
 
 if [[ -n "${kernel_pkgs}" ]]; then
-  echo "[*] Найдены пакеты ядра для hold:"
-  echo "${kernel_pkgs}"
-  for pkg in ${kernel_pkgs}; do
-    if apt-mark hold "${pkg}" >/dev/null 2>&1; then
-      echo "    - ${pkg} поставлен на hold"
-    else
-      echo "    - [WARN] не удалось поставить на hold ${pkg}"
-    fi
-  done
+    log "[*] Найдены пакеты ядра для hold:"
+    echo "${kernel_pkgs}"
+    for pkg in ${kernel_pkgs}; do
+        if apt-mark hold "${pkg}" >/dev/null 2>&1; then
+            log "    - ${pkg} поставлен на hold"
+        else
+            log "    - [WARN] не удалось поставить на hold ${pkg}"
+        fi
+    done
 else
-  echo "[*] Установленных пакетов linux-image-*/linux-headers-* не найдено."
+    log "[*] Установленных пакетов linux-image-*/linux-headers-* не найдено."
 fi
 
-### 6. Полный запрет установки новых ядер через APT (pinning)
-
-echo "[*] Включаем APT pinning: запрещаем установку любых новых ядер и headers..."
-
+# Полный запрет установки новых ядер через APT (pinning)
+log "[*] Включаем APT pinning: запрещаем установку любых новых ядер и headers..."
 cat >/etc/apt/preferences.d/no-kernel <<'EOF'
 Package: linux-image*
 Pin: version *
@@ -98,29 +114,26 @@ Pin: version *
 Pin-Priority: -1
 EOF
 
-echo "[*] APT pinning установлен: linux-image* и linux-headers* больше не будут устанавливаться."
+log "[*] APT pinning установлен: linux-image* и linux-headers* больше не будут устанавливаться."
 
-
-### 7. Установка ПО
-
-echo "[*] Устанавливаем ПО..."
+# Установка ПО
+log "[*] Устанавливаем ПО..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y mc wireguard-tools ssh curl sudo jq fping snmp
 
-### 8. Фикс /boot/boot.config
-
-echo "[*] Правим /boot/boot.config..."
+# Фикс /boot/boot.config
+log "[*] Правим /boot/boot.config..."
 
 BOOTCFG="/boot/boot.config"
 
 if [[ -f "${BOOTCFG}" ]]; then
-  sed -i 's/^majorbranch=.*/majorbranch=6.x.y/' "${BOOTCFG}" || true
-  sed -i 's/^branch=.*/branch=6.12.y/' "${BOOTCFG}" || true
-  sed -i 's/^release=.*/release=6.12.17-meson64/' "${BOOTCFG}" || true
-  sed -i 's/^variant=.*/variant=mainline/' "${BOOTCFG}" || true
+    sed -i 's/^majorbranch=.*/majorbranch=6.x.y/' "${BOOTCFG}" || true
+    sed -i 's/^branch=.*/branch=6.12.y/' "${BOOTCFG}" || true
+    sed -i 's/^release=.*/release=6.12.17-meson64/' "${BOOTCFG}" || true
+    sed -i 's/^variant=.*/variant=mainline/' "${BOOTCFG}" || true
 else
-  cat >"${BOOTCFG}" <<'EOF'
+    cat >"${BOOTCFG}" <<'EOF'
 # Kernel version config
 majorbranch=6.x.y
 branch=6.12.y
@@ -132,17 +145,15 @@ fi
 chmod 644 "${BOOTCFG}"
 chown root:root "${BOOTCFG}"
 
-# Попытка сделать immutable
 if command -v chattr >/dev/null 2>&1; then
-  chattr +i "${BOOTCFG}" || echo "[WARN] Не удалось выставить immutable на ${BOOTCFG}"
-  echo "[*] ${BOOTCFG} помечен как immutable"
+    chattr +i "${BOOTCFG}" || log "[WARN] Не удалось выставить immutable на ${BOOTCFG}"
+    log "[*] ${BOOTCFG} помечен как immutable"
 else
-  echo "[WARN] chattr не найден, immutable не установлен."
+    log "[WARN] chattr не найден, immutable не установлен."
 fi
 
-### 9. Скрипт установки monito
-
-echo "[*] Создаем /root/monito-install.sh..."
+# Скрипт установки monito
+log "[*] Создаем /root/monito-install.sh..."
 cat >/root/monito-install.sh <<'EOF'
 #!/usr/bin/env bash
 curl -s https://get.monito.run | bash
@@ -150,22 +161,19 @@ EOF
 
 chmod +x /root/monito-install.sh
 
-### 10. Финальное сообщение
-
-echo
-echo "[✓] Установка завершена!"
-echo "[✓] Ядро зафиксировано и boot.config защищён."
-echo "[✓] Для установки Monito запускайте: /root/monito-install.sh"
-echo
+# Финальное сообщение
+log "[✓] Установка завершена!"
+log "[✓] Ядро зафиксировано и boot.config защищён."
+log "[✓] Для установки Monito запускайте: /root/monito-install.sh"
 
 read -r -p "Хотите выполнить перезагрузку сейчас? [y/N]: " ans
 case "${ans,,}" in
     y|yes)
-        echo "Перезагрузка..."
+        log "Перезагрузка..."
         sleep 1
         reboot
         ;;
     *)
-        echo "Ок, перезагрузка отменена. Не забудьте выполнить reboot позже."
+        log "Ок, перезагрузка отменена. Не забудьте выполнить reboot позже."
         ;;
 esac

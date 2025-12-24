@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_RAW="https://raw.githubusercontent.com/xVeDi/monito-host-setup/main/files"
 
 log() {
-    echo "[`date '+%Y-%m-%d %H:%M:%S'`] $1"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
 check_command() {

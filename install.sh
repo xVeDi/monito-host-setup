@@ -22,15 +22,10 @@ check_command timedatectl
 check_command chpasswd
 check_command apt-get
 
-# Функция загрузки файлов с проверкой существования
+# Функция загрузки файлов с перезаписью
 safe_download() {
     local file="$1"
     local dest="$2"
-
-    if [[ -f "$dest" ]]; then
-        log "[INFO] Файл $dest уже существует, пропускаем загрузку."
-        return
-    fi
 
     if command -v wget >/dev/null; then
         wget -qO "$dest" "$REPO_RAW/$file"
@@ -40,6 +35,8 @@ safe_download() {
         log "[ERROR] Нужен wget или curl для загрузки файлов."
         exit 1
     fi
+
+    log "[INFO] Файл $dest загружен и заменён."
 }
 
 # Проверка прав

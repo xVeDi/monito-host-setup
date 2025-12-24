@@ -162,6 +162,19 @@ EOF
 
 chmod +x /root/monito-install.sh
 
+# Загрузка и замена display_service.sh
+log "[*] Обновляем файл display_service.sh..."
+safe_download "display_service.sh" "/usr/lib/tm16xx-display/display_service.sh"
+chmod +x /usr/lib/tm16xx-display/display_service.sh
+
+# Рестарт службы tm16xx-display.service
+log "[*] Перезапускаем службу tm16xx-display.service..."
+if systemctl restart tm16xx-display.service; then
+    log "[✓] Служба tm16xx-display.service успешно перезапущена."
+else
+    log "[ERROR] Не удалось перезапустить службу tm16xx-display.service."
+fi
+
 # Финальное сообщение
 log "[✓] Установка завершена!"
 log "[✓] Ядро зафиксировано и boot.config защищён."

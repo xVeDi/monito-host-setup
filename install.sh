@@ -54,10 +54,14 @@ log "[*] Настройка хоста для работы Monito..."
 log "[*] Копируем файлы motd и issue..."
 install -d /usr/lib/qubian/update-motd.d
 
+log "[DEBUG] Проверяем загрузку 01-header..."
 safe_download "01-header"       "/usr/lib/qubian/update-motd.d/01-header"
+log "[DEBUG] Проверяем загрузку 15-system-state..."
 safe_download "15-system-state" "/usr/lib/qubian/update-motd.d/15-system-state"
 
+log "[DEBUG] Проверяем загрузку issue..."
 safe_download "issue"     "/etc/issue"
+log "[DEBUG] Проверяем загрузку issue.net..."
 safe_download "issue.net" "/etc/issue.net"
 
 chmod 755 /usr/lib/qubian/update-motd.d/01-header

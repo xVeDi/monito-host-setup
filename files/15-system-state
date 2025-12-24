@@ -12,37 +12,34 @@ row() {
 	eval "echo -e \"${notab[@]}\""
 }
 
-ROOTFS=$(findmnt --target / -n -o SOURCE)
-ROOTFS_TOTAL=$(df -H / --output=pcent,size|sed -n 2p)
+ROOTFS=$(findmnt --target / -n -o SOURCE 2>/dev/null || echo "unknown")
+ROOTFS_TOTAL=$(df -H / --output=pcent,size 2>/dev/null | sed -n 2p || echo "0% 0")
 ROOTFS_USAGE=${ROOTFS_TOTAL%'%'*}
-ROOTFS_TOTAL=$(echo ${ROOTFS_TOTAL}|'grep' -Eo '[0-9.]+[KGM]?$')
+ROOTFS_TOTAL=$(echo ${ROOTFS_TOTAL} | grep -Eo '[0-9.]+[KGM]?$' || echo "unknown")
 ROOTFS_COLOR=LGREEN
 (( ROOTFS_USAGE > 70 )) && ROOTFS_COLOR=LYELLOW
 (( ROOTFS_USAGE > 90 )) && ROOTFS_COLOR=LRED
 
-BOOTFS=$(findmnt --target /boot -n -o SOURCE)
-BOOTFS_TOTAL=$(df -H /boot --output=pcent,size|sed -n 2p)
+BOOTFS=$(findmnt --target /boot -n -o SOURCE 2>/dev/null || echo "unknown")
+BOOTFS_TOTAL=$(df -H /boot --output=pcent,size 2>/dev/null | sed -n 2p || echo "0% 0")
 BOOTFS_USAGE=${BOOTFS_TOTAL%'%'*}
-BOOTFS_TOTAL=$(echo ${BOOTFS_TOTAL}|'grep' -Eo '[0-9.]+[KGM]?$')
+BOOTFS_TOTAL=$(echo ${BOOTFS_TOTAL} | grep -Eo '[0-9.]+[KGM]?$' || echo "unknown")
 BOOTFS_COLOR=LGREEN
 (( BOOTFS_USAGE > 70 )) && BOOTFS_COLOR=LYELLOW
 (( BOOTFS_USAGE > 90 )) && BOOTFS_COLOR=LRED
 
-#UPTIME=$(uptime|'grep' -oE "[0-9]+ (min|days)"|head -n1)
-UPTIME=$(uptime|sed -E "s/.*up\s+([0-9]+(:|\sdays|\smin)).*/\1/"|sed "s/:/ hours/")
-CPULOAD=$(uptime|'grep' -Po '(?<=average: )[0-9]+')
-MEMLOAD=$(free --mebi|'grep' "Mem"|sed -E 's/([^0-9]+([0-9]+)[^0-9]+([0-9]+).*)/\2 \3/')
-MEMTOTAL=$(echo $MEMLOAD|cut -d' ' -f1)
-MEMLOAD=$(echo $MEMLOAD|cut -d' ' -f2)
+UPTIME=$(uptime 2>/dev/null | sed -E "s/.*up\s+([0-9]+(:|\sdays|\smin)).*/\1/" | sed "s/:/ hours/" || echo "unknown")
+CPULOAD=$(uptime 2>/dev/null | grep -Po '(?<=average: )[0-9]+' || echo "0")
+MEMLOAD=$(free --mebi 2>/dev/null | grep "Mem" | sed -E 's/([^0-9]+([0-9]+)[^0-9]+([0-9]+).*)/\2 \3/' || echo "0 0")
+MEMTOTAL=$(echo $MEMLOAD | cut -d' ' -f1)
+MEMLOAD=$(echo $MEMLOAD | cut -d' ' -f2)
 MEMLOAD=$(( (($MEMTOTAL/2) + ($MEMLOAD * 100)) / $MEMTOTAL ))
 
-BOOTTIME=$(systemd-analyze 2>/dev/null |head -n 1|'grep' -Po '[0-9]+(?=\.[0-9]+s\s?$)')
-[[ -z ${BOOTTIME} ]] && \
-	BOOTTIME=$(cat /proc/uptime | 'grep' -Eo '^[0-9]+')
+BOOTTIME=$(systemd-analyze 2>/dev/null | head -n 1 | grep -Po '[0-9]+(?=\.[0-9]+s\s?$)' || echo "unknown")
+[[ -z ${BOOTTIME} ]] && BOOTTIME=$(cat /proc/uptime 2>/dev/null | grep -Eo '^[0-9]+' || echo "unknown")
 BOOTTIME_COLOR=LGREEN
 (( BOOTTIME > 30 )) && BOOTTIME_COLOR=LYELLOW
 (( BOOTTIME > 60 )) && BOOTTIME_COLOR=LRED
-
 
 CPUTEMP=$(( $(cat /sys/devices/virtual/thermal/thermal_zone0/temp 2>/dev/null || echo -99000) / 1000 ))
 CPUTEMP_COLOR=LGREEN
@@ -56,9 +53,10 @@ DDRTEMP_COLOR=LGREEN
 (( DDRTEMP > 80 )) && DDRTEMP_COLOR=LRED
 (( DDRTEMP == -99 )) && DDRTEMP_COLOR=GRAY && DDRTEMP="__"
 
-IPADDRESSES=($(ip a|'grep' -Po "(?<=inet\s)[0-9.]+(?=.*brd)"|xargs))
-EXTERNAL_IP4=$(dig @ns1.google.com TXT o-o.myaddr.l.google.com +short -4|cut -d'"' -f2)
-EXTERNAL_IP6=$(dig @ns1.google.com TXT o-o.myaddr.l.google.com +short -6|cut -d'"' -f2)
+IPADDRESSES=($(ip a 2>/dev/null | grep -Po "(?<=inet\s)[0-9.]+(?=.*brd)" | xargs || echo "unknown"))
+EXTERNAL_IP4=$(dig @ns1.google.com TXT o-o.myaddr.l.google.com +short -4 2>/dev/null | cut -d'"' -f2 || echo "unknown")
+EXTERNAL_IP6=$(dig @ns1.google.com TXT o-o.myaddr.l.google.com +short -6 2>/dev/null | cut -d'"' -f2 || echo "unknown")
+
 echo ""
 row '$(column 14 Up time:)		$(column WHITE 18 ${UPTIME})				$(column 14 Boot time:)			$(column ${BOOTTIME_COLOR} 1 ${BOOTTIME} s)'
 row '$(column 14 CPU usage:)	$(column LGREEN 18 ${CPULOAD}%)				$(column 14 Memory usage:) 		$(column LGREEN 0 ${MEMLOAD}%) of ${MEMTOTAL}M'
